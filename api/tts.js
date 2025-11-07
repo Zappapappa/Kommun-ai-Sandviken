@@ -27,8 +27,9 @@ export default async function handler(req, res) {
     }
 
     // Use Azure REST API instead of SDK
+    // Using HilleviNeural as Sofia might not be available in all regions
     const ssml = `<speak version='1.0' xml:lang='sv-SE'>
-      <voice xml:lang='sv-SE' name='sv-SE-SofiaNeural'>
+      <voice xml:lang='sv-SE' name='sv-SE-HilleviNeural'>
         ${text.replace(/[<>&'"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]))}
       </voice>
     </speak>`;

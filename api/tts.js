@@ -1,5 +1,3 @@
-import * as sdk from 'microsoft-cognitiveservices-speech-sdk';
-
 export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -28,40 +26,39 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Azure credentials not configured' });
     }
 
-    // Configure Azure Speech
-    const speechConfig = sdk.SpeechConfig.fromSubscription(speechKey, speechRegion);
-    speechConfig.speechSynthesisVoiceName = 'sv-SE-SofiaNeural';
-    speechConfig.speechSynthesisOutputFormat = sdk.SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3;
+    // Use Azure REST API instead of SDK
+    const ssml = `<speak version='1.0' xml:lang='sv-SE'>
+      <voice xml:lang='sv-SE' name='sv-SE-SofiaNeural'>
+        ${text.replace(/[<>&'"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]))}
+      </voice>
+    </speak>`;
 
-    // Create synthesizer
-    const synthesizer = new sdk.SpeechSynthesizer(speechConfig);
-
-    // Synthesize speech
-    const result = await new Promise((resolve, reject) => {
-      synthesizer.speakTextAsync(
-        text,
-        result => {
-          synthesizer.close();
-          resolve(result);
+    const response = await fetch(
+      `https://${speechRegion}.tts.speech.microsoft.com/cognitiveservices/v1`,
+      {
+        method: 'POST',
+        headers: {
+          'Ocp-Apim-Subscription-Key': speechKey,
+          'Content-Type': 'application/ssml+xml',
+          'X-Microsoft-OutputFormat': 'audio-16khz-32kbitrate-mono-mp3',
         },
-        error => {
-          synthesizer.close();
-          reject(error);
-        }
-      );
-    });
+        body: ssml,
+      }
+    );
 
-    if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
-      // Convert audio to base64
-      const audioData = Buffer.from(result.audioData).toString('base64');
-      
-      res.status(200).json({
-        audio: audioData,
-        format: 'mp3'
-      });
-    } else {
-      throw new Error(`Speech synthesis failed: ${result.errorDetails}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Azure TTS failed: ${response.status} - ${errorText}`);
     }
+
+    // Get audio as array buffer and convert to base64
+    const audioBuffer = await response.arrayBuffer();
+    const audioBase64 = Buffer.from(audioBuffer).toString('base64');
+
+    res.status(200).json({
+      audio: audioBase64,
+      format: 'mp3'
+    });
 
   } catch (err) {
     console.error('TTS error:', err);

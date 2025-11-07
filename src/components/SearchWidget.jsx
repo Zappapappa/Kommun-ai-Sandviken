@@ -294,12 +294,12 @@ export default function SearchWidget({
                               {item.sources.map((src, i) => (
                                 <li key={i} style={styles.sourceItem}>
                                   <a
-                                    href={src}
+                                    href={src.url || src}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     style={styles.sourceLink}
                                   >
-                                    {src}
+                                    {src.title || src.url || src}
                                   </a>
                                 </li>
                               ))}

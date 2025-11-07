@@ -31,7 +31,6 @@ export default function SearchWidget({
   const [error, setError] = useState('');
   const [playingIndex, setPlayingIndex] = useState(null);
   const [language, setLanguage] = useState('sv'); // Always default to Swedish
-  const [debugInfo, setDebugInfo] = useState([]); // Debug messages
   // Keep a reference to any currently used Audio object
   const audioRef = useRef(null);
   const closeButtonRef = useRef(null);
@@ -260,11 +259,6 @@ export default function SearchWidget({
 
   // TTS - Spela upp text
   const handlePlayAudio = async (text, index) => {
-    const addDebug = (msg) => {
-      setDebugInfo(prev => [...prev, `${new Date().toLocaleTimeString()}: ${msg}`]);
-      console.log(msg);
-    };
-    
     // Stop currently playing audio
     if (audioRef.current) { 
       audioRef.current.pause(); 
@@ -277,22 +271,17 @@ export default function SearchWidget({
     }
 
     setPlayingIndex(index);
-    addDebug('Starting TTS request...');
 
     try {
-      addDebug(`Fetching TTS for language: ${language}`);
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, language }),
       });
 
-      addDebug(`TTS Response status: ${res.status}`);
-
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        addDebug(`TTS API error: ${JSON.stringify(errorData)}`);
-        alert(`TTS fel: ${errorData.error || 'Okänt fel'}`);
+        console.error('TTS API error:', errorData);
         setPlayingIndex(null);
         return;
       }
@@ -300,11 +289,8 @@ export default function SearchWidget({
       const data = await res.json();
       
       if (!data.audio) {
-        addDebug('No audio data in response');
         throw new Error('No audio data received');
       }
-      
-      addDebug('TTS audio received, creating Audio object...');
       
       // Create audio element and play immediately (within user gesture)
       const audio = new Audio();
@@ -313,35 +299,31 @@ export default function SearchWidget({
       audioRef.current = audio;
       
       audio.onended = () => {
-        addDebug('Audio playback ended');
         setPlayingIndex(null);
         audioRef.current = null;
       };
       
       audio.onerror = (e) => {
-        addDebug(`Audio playback error: ${e.type}`);
+        console.error('Audio playback error:', e);
         setPlayingIndex(null);
         audioRef.current = null;
       };
       
       // Play must happen synchronously in the click handler for mobile
-      addDebug('Starting audio.play()...');
       const playPromise = audio.play();
       
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            addDebug('✓ Audio playing successfully!');
+            console.log('Audio playing successfully');
           })
           .catch((err) => {
-            addDebug(`✗ Play blocked: ${err.message}`);
-            alert(`Ljud blockerades: ${err.message}`);
+            console.error('Play was prevented:', err);
             setPlayingIndex(null);
           });
       }
     } catch (err) {
-      addDebug(`✗ Error: ${err.message}`);
-      alert(`Fel: ${err.message}`);
+      console.error('Audio error:', err);
       setPlayingIndex(null);
     }
   };
@@ -482,6 +464,13 @@ export default function SearchWidget({
                   setOpen(false);
                   setChatHistory([]);
                   setError('');
+                  setLanguage('sv'); // Reset to Swedish
+                  setQ(''); // Clear input
+                  if (audioRef.current) {
+                    audioRef.current.pause();
+                    audioRef.current = null;
+                  }
+                  setPlayingIndex(null);
                 }}
                 aria-label="Stäng"
                 style={styles.closeButton}
@@ -568,22 +557,6 @@ export default function SearchWidget({
 
                 <div ref={chatEndRef} />
               </div>
-              
-              {/* Debug panel - visar TTS fel */}
-              {debugInfo.length > 0 && (
-                <div style={styles.debugPanel}>
-                  <h4 style={styles.debugTitle}>Debug Log (TTS):</h4>
-                  {debugInfo.slice(-10).map((msg, i) => (
-                    <div key={i} style={styles.debugMessage}>{msg}</div>
-                  ))}
-                  <button 
-                    onClick={() => setDebugInfo([])}
-                    style={styles.debugClear}
-                  >
-                    Rensa
-                  </button>
-                </div>
-              )}
             </div>
 
             {/* Modal footer - fast i botten */}
@@ -739,10 +712,10 @@ const styles = {
   languageSelector: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
+    gap: '8px',
     marginLeft: 'auto',
     marginRight: '16px',
-    padding: '8px 16px',
+    padding: '6px 12px',
     background: '#f8fafc',
     borderRadius: '12px',
     border: '1px solid #e2e8f0',
@@ -752,6 +725,7 @@ const styles = {
     fontWeight: '600',
     color: '#64748b',
     marginRight: '4px',
+    whiteSpace: 'nowrap',
   },
   languageButton: {
     display: 'flex',
@@ -760,24 +734,29 @@ const styles = {
     background: '#fff',
     border: '2px solid #e2e8f0',
     cursor: 'pointer',
-    padding: '6px 12px',
+    padding: '8px 12px',
     borderRadius: '8px',
     transition: 'all 0.2s',
     fontSize: '14px',
     fontWeight: '500',
     color: '#64748b',
+    outline: 'none',
+    whiteSpace: 'nowrap',
   },
   languageButtonActive: {
-    borderColor: '#216c9e',
-    background: '#f0f9ff',
-    color: '#216c9e',
-    boxShadow: '0 0 0 3px rgba(33, 108, 158, 0.1)',
+    border: '2px solid #216c9e',
+    background: '#216c9e',
+    color: '#fff',
+    fontWeight: '600',
   },
   flagIcon: {
-    fontSize: '18px',
+    fontSize: '20px',
+    lineHeight: 1,
+    display: 'inline-block',
   },
   languageText: {
     fontSize: '13px',
+    lineHeight: 1,
   },
   closeButton: {
     background: 'none',
@@ -961,37 +940,5 @@ const styles = {
     textDecoration: 'none',
     wordBreak: 'break-all',
     transition: 'color 0.2s',
-  },
-  debugPanel: {
-    marginTop: '16px',
-    padding: '12px',
-    background: '#fff3cd',
-    borderRadius: '8px',
-    border: '1px solid #ffc107',
-    maxHeight: '200px',
-    overflow: 'auto',
-  },
-  debugTitle: {
-    fontSize: '12px',
-    fontWeight: '600',
-    color: '#856404',
-    marginTop: 0,
-    marginBottom: '8px',
-  },
-  debugMessage: {
-    fontSize: '11px',
-    fontFamily: 'monospace',
-    color: '#856404',
-    marginBottom: '4px',
-    wordBreak: 'break-all',
-  },
-  debugClear: {
-    marginTop: '8px',
-    padding: '4px 8px',
-    fontSize: '11px',
-    background: '#ffc107',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
   },
 };

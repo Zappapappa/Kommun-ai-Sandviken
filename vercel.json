@@ -5,6 +5,14 @@
     {
       "source": "/search",
       "destination": "/api/search"
+    },
+    {
+      "source": "/api/tts",
+      "destination": "/api/tts"
+    },
+    {
+      "source": "/api/translate",
+      "destination": "/api/translate"
     }
   ],
   "functions": {

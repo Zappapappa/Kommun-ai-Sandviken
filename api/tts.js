@@ -22,8 +22,18 @@ export default async function handler(req, res) {
     const speechKey = process.env.AZURE_SPEECH_KEY;
     const speechRegion = process.env.AZURE_SPEECH_REGION;
 
+    console.log('TTS API called');
+    console.log('Speech Key exists:', !!speechKey);
+    console.log('Speech Region:', speechRegion);
+
     if (!speechKey || !speechRegion) {
-      return res.status(500).json({ error: 'Azure credentials not configured' });
+      console.error('Azure credentials missing!');
+      console.error('AZURE_SPEECH_KEY:', speechKey ? 'EXISTS' : 'MISSING');
+      console.error('AZURE_SPEECH_REGION:', speechRegion || 'MISSING');
+      return res.status(500).json({ 
+        error: 'Azure Speech credentials not configured in Vercel environment variables',
+        details: 'Please add AZURE_SPEECH_KEY and AZURE_SPEECH_REGION in Vercel Dashboard'
+      });
     }
 
     // Select voice based on language

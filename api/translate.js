@@ -22,8 +22,18 @@ export default async function handler(req, res) {
     const translatorKey = process.env.AZURE_TRANSLATOR_KEY;
     const translatorRegion = process.env.AZURE_TRANSLATOR_REGION;
 
+    console.log('Translate API called');
+    console.log('Translator Key exists:', !!translatorKey);
+    console.log('Translator Region:', translatorRegion);
+
     if (!translatorKey || !translatorRegion) {
-      return res.status(500).json({ error: 'Azure Translator credentials not configured' });
+      console.error('Azure Translator credentials missing!');
+      console.error('AZURE_TRANSLATOR_KEY:', translatorKey ? 'EXISTS' : 'MISSING');
+      console.error('AZURE_TRANSLATOR_REGION:', translatorRegion || 'MISSING');
+      return res.status(500).json({ 
+        error: 'Azure Translator credentials not configured in Vercel environment variables',
+        details: 'Please add AZURE_TRANSLATOR_KEY and AZURE_TRANSLATOR_REGION in Vercel Dashboard'
+      });
     }
 
     // Use Azure Translator REST API

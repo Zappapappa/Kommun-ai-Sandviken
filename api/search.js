@@ -41,20 +41,33 @@ export default async function handler(req, res) {
 
     if (error) throw error;
 
-    // 3. Build context
+    // 3. Get page info for sources
+    const pageIds = chunks ? [...new Set(chunks.map(c => c.page_id))] : [];
+    const { data: pages } = await supabase
+      .from('pages')
+      .select('id, url, title')
+      .in('id', pageIds);
+
+    // 4. Build context and sources
     let context = '';
     const sourceMap = new Map();
     
     if (chunks && chunks.length > 0) {
       chunks.forEach((chunk) => {
         context += chunk.content + '\n\n';
-        if (chunk.page_url && chunk.page_title) {
-          sourceMap.set(chunk.page_url, chunk.page_title);
-        }
       });
+      
+      // Add sources from pages
+      if (pages && pages.length > 0) {
+        pages.forEach((page) => {
+          if (page.url && page.title) {
+            sourceMap.set(page.url, page.title);
+          }
+        });
+      }
     }
 
-    // 4. Get AI response
+    // 5. Get AI response
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       temperature: 0.5,

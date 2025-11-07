@@ -138,11 +138,29 @@ export default function SearchWidget({
     setQ(''); // Rensa inputfältet
 
     try {
+      // Om språket är engelska, översätt frågan till svenska först
+      let questionToSearch = userQuestion;
+      if (language === 'en') {
+        try {
+          const translateRes = await fetch('/api/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: userQuestion, targetLang: 'sv' }),
+          });
+          if (translateRes.ok) {
+            const translateData = await translateRes.json();
+            questionToSearch = translateData.translatedText || userQuestion;
+          }
+        } catch (translateErr) {
+          console.error('Translation failed, using original question:', translateErr);
+        }
+      }
+
       // Skicka med chat-historik till backend (max 5 senaste)
       const recentHistory = chatHistory.slice(-5);
       const historyParam = encodeURIComponent(JSON.stringify(recentHistory));
       
-      const res = await fetch(`${apiUrl}?q=${encodeURIComponent(userQuestion)}&history=${historyParam}`, {
+      const res = await fetch(`${apiUrl}?q=${encodeURIComponent(questionToSearch)}&history=${historyParam}`, {
         method: 'GET',
         ...(requestOptions ?? {}),
       });
@@ -761,6 +779,8 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     gap: '12px',
+    position: 'relative',
+    zIndex: 10,
   },
   loadingSpinner: {
     display: 'flex',

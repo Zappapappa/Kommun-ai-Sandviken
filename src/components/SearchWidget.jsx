@@ -31,6 +31,7 @@ export default function SearchWidget({
   const [error, setError] = useState('');
   const [playingIndex, setPlayingIndex] = useState(null);
   const [language, setLanguage] = useState('sv'); // Always default to Swedish
+  const [debugInfo, setDebugInfo] = useState([]); // Debug messages
   // Keep a reference to any currently used Audio object
   const audioRef = useRef(null);
   const closeButtonRef = useRef(null);
@@ -259,66 +260,88 @@ export default function SearchWidget({
 
   // TTS - Spela upp text
   const handlePlayAudio = async (text, index) => {
+    const addDebug = (msg) => {
+      setDebugInfo(prev => [...prev, `${new Date().toLocaleTimeString()}: ${msg}`]);
+      console.log(msg);
+    };
+    
+    // Stop currently playing audio
+    if (audioRef.current) { 
+      audioRef.current.pause(); 
+      audioRef.current = null; 
+    }
+
+    if (playingIndex === index) {
+      setPlayingIndex(null);
+      return;
+    }
+
+    setPlayingIndex(index);
+    addDebug('Starting TTS request...');
+
     try {
-      // Stop currently playing audio
-      if (audioRef.current) { 
-        audioRef.current.pause(); 
-        audioRef.current = null; 
-      }
-
-      if (playingIndex === index) {
-        setPlayingIndex(null);
-        return;
-      }
-
-      setPlayingIndex(index);
-
-      console.log('Fetching TTS audio for language:', language);
+      addDebug(`Fetching TTS for language: ${language}`);
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, language }),
       });
 
+      addDebug(`TTS Response status: ${res.status}`);
+
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('TTS API error:', errorData);
-        throw new Error(errorData.error || 'TTS failed');
+        addDebug(`TTS API error: ${JSON.stringify(errorData)}`);
+        alert(`TTS fel: ${errorData.error || 'Okänt fel'}`);
+        setPlayingIndex(null);
+        return;
       }
 
       const data = await res.json();
       
       if (!data.audio) {
+        addDebug('No audio data in response');
         throw new Error('No audio data received');
       }
       
-      console.log('TTS audio received, playing...');
+      addDebug('TTS audio received, creating Audio object...');
       
-      // Always use new Audio() for Android Chrome compatibility
-      // Creating new Audio in click handler ensures user gesture is respected
-      const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
-      audio.setAttribute('playsinline', 'true');
+      // Create audio element and play immediately (within user gesture)
+      const audio = new Audio();
+      audio.preload = 'auto';
+      audio.src = `data:audio/mp3;base64,${data.audio}`;
       audioRef.current = audio;
       
       audio.onended = () => {
-        console.log('Audio playback ended');
+        addDebug('Audio playback ended');
         setPlayingIndex(null);
         audioRef.current = null;
       };
       
       audio.onerror = (e) => {
-        console.error('Audio playback error:', e);
+        addDebug(`Audio playback error: ${e.type}`);
         setPlayingIndex(null);
         audioRef.current = null;
-        alert('Fel vid uppspelning av ljud');
       };
       
-      // Play immediately - user gesture is from button click
-      await audio.play();
-      console.log('Audio playing successfully');
+      // Play must happen synchronously in the click handler for mobile
+      addDebug('Starting audio.play()...');
+      const playPromise = audio.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            addDebug('✓ Audio playing successfully!');
+          })
+          .catch((err) => {
+            addDebug(`✗ Play blocked: ${err.message}`);
+            alert(`Ljud blockerades: ${err.message}`);
+            setPlayingIndex(null);
+          });
+      }
     } catch (err) {
-      console.error('Audio error:', err);
-      alert('Kunde inte spela upp ljud. Fel: ' + err.message);
+      addDebug(`✗ Error: ${err.message}`);
+      alert(`Fel: ${err.message}`);
       setPlayingIndex(null);
     }
   };
@@ -545,6 +568,22 @@ export default function SearchWidget({
 
                 <div ref={chatEndRef} />
               </div>
+              
+              {/* Debug panel - visar TTS fel */}
+              {debugInfo.length > 0 && (
+                <div style={styles.debugPanel}>
+                  <h4 style={styles.debugTitle}>Debug Log (TTS):</h4>
+                  {debugInfo.slice(-10).map((msg, i) => (
+                    <div key={i} style={styles.debugMessage}>{msg}</div>
+                  ))}
+                  <button 
+                    onClick={() => setDebugInfo([])}
+                    style={styles.debugClear}
+                  >
+                    Rensa
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Modal footer - fast i botten */}
@@ -922,5 +961,37 @@ const styles = {
     textDecoration: 'none',
     wordBreak: 'break-all',
     transition: 'color 0.2s',
+  },
+  debugPanel: {
+    marginTop: '16px',
+    padding: '12px',
+    background: '#fff3cd',
+    borderRadius: '8px',
+    border: '1px solid #ffc107',
+    maxHeight: '200px',
+    overflow: 'auto',
+  },
+  debugTitle: {
+    fontSize: '12px',
+    fontWeight: '600',
+    color: '#856404',
+    marginTop: 0,
+    marginBottom: '8px',
+  },
+  debugMessage: {
+    fontSize: '11px',
+    fontFamily: 'monospace',
+    color: '#856404',
+    marginBottom: '4px',
+    wordBreak: 'break-all',
+  },
+  debugClear: {
+    marginTop: '8px',
+    padding: '4px 8px',
+    fontSize: '11px',
+    background: '#ffc107',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
   },
 };

@@ -27,8 +27,8 @@ export default async function handler(req, res) {
     }
 
     // Use Azure REST API instead of SDK
-    // Using Sofia Neural voice
-    const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='sv-SE'><voice name='sv-SE-SofiaNeural'>${text}</voice></speak>`;
+    // Using Sofie Neural voice (note: Sofie, not Sofia!)
+    const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='sv-SE'><voice name='sv-SE-SofieNeural'>${text}</voice></speak>`;
 
     const response = await fetch(
       `https://${speechRegion}.tts.speech.microsoft.com/cognitiveservices/v1`,

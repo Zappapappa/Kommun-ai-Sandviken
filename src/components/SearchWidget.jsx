@@ -29,6 +29,8 @@ export default function SearchWidget({
   const [loading, setLoading] = useState(false);
   const [chatHistory, setChatHistory] = useState([]);
   const [error, setError] = useState('');
+  const [playingIndex, setPlayingIndex] = useState(null);
+  const audioRef = useRef(null);
   const closeButtonRef = useRef(null);
   const previouslyFocusedElementRef = useRef(null);
   const chatEndRef = useRef(null);
@@ -146,6 +148,46 @@ export default function SearchWidget({
       setChatHistory((prev) => prev.slice(0, -1));
     } finally {
       setLoading(false);
+    }
+  };
+
+  // TTS - Spela upp text
+  const handlePlayAudio = async (text, index) => {
+    try {
+      // Stop currently playing audio
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+
+      if (playingIndex === index) {
+        setPlayingIndex(null);
+        return;
+      }
+
+      setPlayingIndex(index);
+
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!res.ok) throw new Error('TTS failed');
+
+      const data = await res.json();
+      const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
+      audioRef.current = audio;
+
+      audio.onended = () => {
+        setPlayingIndex(null);
+        audioRef.current = null;
+      };
+
+      audio.play();
+    } catch (err) {
+      console.error('Audio error:', err);
+      setPlayingIndex(null);
     }
   };
 
@@ -289,7 +331,17 @@ export default function SearchWidget({
                     )}
                     {item.type === 'answer' && (
                       <div style={styles.answerBubble}>
-                        <p style={styles.answerText}>{item.text}</p>
+                        <div style={styles.answerHeader}>
+                          <p style={styles.answerText}>{item.text}</p>
+                          <button
+                            onClick={() => handlePlayAudio(item.text, index)}
+                            style={styles.playButton}
+                            title="Lyssna på svaret"
+                            aria-label="Spela upp svar"
+                          >
+                            {playingIndex === index ? '⏸️' : '🔊'}
+                          </button>
+                        </div>
                         {console.log('Rendering sources for answer:', item.sources)}
                         {item.sources && item.sources.length > 0 && (
                           <div style={styles.sourcesBox}>
@@ -535,7 +587,13 @@ const styles = {
     marginBottom: '8px',
     animation: 'fadeIn 0.8s ease-out',
   },
+  answerHeader: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '12px',
+  },
   answerText: {
+    flex: 1,
     margin: 0,
     fontSize: '15px',
     lineHeight: '1.7',
@@ -544,6 +602,16 @@ const styles = {
     textAlign: 'left',
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-word',
+  },
+  playButton: {
+    background: 'transparent',
+    border: 'none',
+    fontSize: '20px',
+    cursor: 'pointer',
+    padding: '4px',
+    borderRadius: '4px',
+    transition: 'transform 0.2s, background 0.2s',
+    flexShrink: 0,
   },
   errorBubble: {
     alignSelf: 'center',

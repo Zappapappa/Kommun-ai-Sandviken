@@ -20,7 +20,21 @@ export default function App() {
             .heroContent-mobile {
               left: 0 !important;
               max-width: 100% !important;
-              padding: 0 16px !important;
+              padding: 0 12px !important;
+            }
+            /* Modal full-screen on mobile */
+            .ai-modal-header { flex-wrap: wrap !important; align-items: center !important; gap:8px !important; }
+            .ai-lang-selector { flex-wrap: wrap; gap:8px !important; }
+            .ai-modal-title { font-size:16px !important; }
+            .ai-modal-body { padding:16px !important; }
+            .ai-modal-footer { padding:12px 16px !important; }
+            .ai-close { font-size:20px !important; }
+            /* Force modal container adjustments */
+            .ai-mobile-fullscreen {
+              width:100% !important;
+              height:100% !important;
+              max-height:100% !important;
+              border-radius:0 !important;
             }
           }
         `}

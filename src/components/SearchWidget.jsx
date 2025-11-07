@@ -30,7 +30,15 @@ export default function SearchWidget({
   const [chatHistory, setChatHistory] = useState([]);
   const [error, setError] = useState('');
   const [playingIndex, setPlayingIndex] = useState(null);
-  const [language, setLanguage] = useState('sv'); // 'sv' or 'en'
+  const [language, setLanguage] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('ai_lang') || 'sv';
+    }
+    return 'sv';
+  }); // 'sv' or 'en'
+  // Dedicated audio element for better mobile support
+  const audioElRef = useRef(null);
+  // Keep a reference to any currently used Audio object (desktop fallback)
   const audioRef = useRef(null);
   const closeButtonRef = useRef(null);
   const previouslyFocusedElementRef = useRef(null);
@@ -87,11 +95,12 @@ export default function SearchWidget({
     }
   }, [chatHistory]);
 
-  // Translate answers when language changes
+  // Persist language + translate already-fetched answers when switching to EN
   useEffect(() => {
-    if (language === 'en') {
-      translateAnswers();
+    if (typeof window !== 'undefined') {
+      try { localStorage.setItem('ai_lang', language); } catch {}
     }
+    if (language === 'en') translateAnswers();
   }, [language]);
 
   const translateAnswers = async () => {
@@ -167,17 +176,35 @@ export default function SearchWidget({
       if (!res.ok) {
         throw new Error(`Fel ${res.status}: ${res.statusText}`);
       }
-      const data = await res.json();
-      const safeAnswer = (data.answer || '').trim();
+  const data = await res.json();
+  const safeAnswer = (data.answer || '').trim();
       const safeSources = Array.isArray(data.sources) ? data.sources : [];
       
       console.log('API Response:', data);
       console.log('Sources:', safeSources);
       
-      // Lägg till svaret i chatten
+      // If English is selected, translate the answer immediately so follow-ups stay in EN
+      let translatedText = null;
+      if (language === 'en' && safeAnswer) {
+        try {
+          const tRes = await fetch('/api/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: safeAnswer, targetLang: 'en' }),
+          });
+          if (tRes.ok) {
+            const tData = await tRes.json();
+            translatedText = tData.translatedText || null;
+          }
+        } catch (e) {
+          console.warn('Failed to translate answer to EN:', e);
+        }
+      }
+
+      // Lägg till svaret i chatten (inkl. översättning om finns)
       setChatHistory((prev) => [
         ...prev,
-        { type: 'answer', text: safeAnswer, sources: safeSources },
+        { type: 'answer', text: safeAnswer, translatedText, sources: safeSources },
       ]);
 
       if (typeof onResult === 'function') {
@@ -203,11 +230,9 @@ export default function SearchWidget({
   // TTS - Spela upp text
   const handlePlayAudio = async (text, index) => {
     try {
-      // Stop currently playing audio
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
+      // Stop currently playing audio (both strategies)
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+      if (audioElRef.current) { audioElRef.current.pause(); }
 
       if (playingIndex === index) {
         setPlayingIndex(null);
@@ -225,15 +250,30 @@ export default function SearchWidget({
       if (!res.ok) throw new Error('TTS failed');
 
       const data = await res.json();
-      const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
-      audioRef.current = audio;
 
-      audio.onended = () => {
-        setPlayingIndex(null);
-        audioRef.current = null;
-      };
-
-      audio.play();
+      // Prefer a persistent <audio> element for mobile reliability
+      if (audioElRef.current) {
+        audioElRef.current.src = `data:audio/mp3;base64,${data.audio}`;
+        // Ensure inline playback on mobile
+        audioElRef.current.setAttribute('playsinline', 'true');
+        audioElRef.current.load();
+        const playPromise = audioElRef.current.play();
+        if (playPromise && typeof playPromise.then === 'function') {
+          await playPromise.catch((err) => {
+            console.warn('Audio play blocked, falling back to new Audio()', err);
+          });
+        }
+        audioElRef.current.onended = () => setPlayingIndex(null);
+      } else {
+        // Fallback: create new Audio object (desktop)
+        const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
+        audioRef.current = audio;
+        audio.onended = () => {
+          setPlayingIndex(null);
+          audioRef.current = null;
+        };
+        await audio.play();
+      }
     } catch (err) {
       console.error('Audio error:', err);
       setPlayingIndex(null);
@@ -337,15 +377,15 @@ export default function SearchWidget({
           aria-modal="true"
           aria-labelledby="modal-title"
         >
-          <div style={styles.modal}>
+          <div style={styles.modal} className="ai-mobile-fullscreen">
             {/* Modal header */}
-            <div style={styles.modalHeader}>
-              <h2 id="modal-title" style={styles.modalTitle}>
+            <div style={styles.modalHeader} className="ai-modal-header">
+              <h2 id="modal-title" style={styles.modalTitle} className="ai-modal-title">
                 {title}
               </h2>
               
               {/* Language selector */}
-              <div style={styles.languageSelector}>
+              <div style={styles.languageSelector} className="ai-lang-selector">
                 <span style={styles.languageLabel}>Välj språk:</span>
                 <button
                   onClick={() => setLanguage('sv')}
@@ -376,18 +416,18 @@ export default function SearchWidget({
                   setOpen(false);
                   setChatHistory([]);
                   setError('');
-                  setLanguage('sv');
                 }}
                 aria-label="Stäng"
                 style={styles.closeButton}
                 ref={closeButtonRef}
+                className="ai-close"
               >
                 ✕
               </button>
             </div>
 
             {/* Modal body */}
-            <div style={styles.modalBody}>
+            <div style={styles.modalBody} className="ai-modal-body">
               {/* Chat historik */}
               <div style={styles.chatContainer}>
                 {chatHistory.map((item, index) => (
@@ -465,7 +505,7 @@ export default function SearchWidget({
             </div>
 
             {/* Modal footer - fast i botten */}
-            <div style={styles.modalFooter}>
+            <div style={styles.modalFooter} className="ai-modal-footer">
               <input
                 ref={modalInputRef}
                 type="text"
@@ -486,6 +526,8 @@ export default function SearchWidget({
               >
                 ➤
               </button>
+              {/* Hidden audio element for reliable mobile playback */}
+              <audio ref={audioElRef} style={{ display: 'none' }} preload="none" />
             </div>
           </div>
         </div>

@@ -27,12 +27,8 @@ export default async function handler(req, res) {
     }
 
     // Use Azure REST API instead of SDK
-    // Using HilleviNeural as Sofia might not be available in all regions
-    const ssml = `<speak version='1.0' xml:lang='sv-SE'>
-      <voice xml:lang='sv-SE' name='sv-SE-HilleviNeural'>
-        ${text.replace(/[<>&'"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]))}
-      </voice>
-    </speak>`;
+    // Using Sofia Neural voice
+    const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='sv-SE'><voice name='sv-SE-SofiaNeural'>${text}</voice></speak>`;
 
     const response = await fetch(
       `https://${speechRegion}.tts.speech.microsoft.com/cognitiveservices/v1`,
@@ -50,6 +46,7 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('Azure TTS error details:', errorText);
       throw new Error(`Azure TTS failed: ${response.status} - ${errorText}`);
     }
 

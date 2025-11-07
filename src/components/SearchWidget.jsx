@@ -30,12 +30,7 @@ export default function SearchWidget({
   const [chatHistory, setChatHistory] = useState([]);
   const [error, setError] = useState('');
   const [playingIndex, setPlayingIndex] = useState(null);
-  const [language, setLanguage] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('ai_lang') || 'sv';
-    }
-    return 'sv';
-  }); // 'sv' or 'en'
+  const [language, setLanguage] = useState('sv'); // Always default to Swedish
   // Keep a reference to any currently used Audio object
   const audioRef = useRef(null);
   const closeButtonRef = useRef(null);
@@ -93,14 +88,28 @@ export default function SearchWidget({
     }
   }, [chatHistory]);
 
-  // Persist language + translate already-fetched answers when switching to EN
+  // Persist language + translate already-fetched answers when switching language
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try { localStorage.setItem('ai_lang', language); } catch {}
     }
-    if (language === 'en' && chatHistory.length > 0) {
-      console.log('Language switched to EN, translating existing answers...');
-      translateAnswers();
+    
+    if (chatHistory.length > 0) {
+      if (language === 'en') {
+        console.log('Language switched to EN, translating existing answers...');
+        translateAnswers();
+      } else if (language === 'sv') {
+        console.log('Language switched to SV, clearing translations...');
+        // Clear translations when switching back to Swedish
+        const updatedHistory = chatHistory.map((item) => {
+          if (item.type === 'answer' && item.translatedText) {
+            const { translatedText, ...rest } = item;
+            return rest;
+          }
+          return item;
+        });
+        setChatHistory(updatedHistory);
+      }
     }
   }, [language]);
 

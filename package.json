@@ -1,0 +1,43 @@
+{
+  "name": "kommun-ai",
+  "version": "1.0.0",
+  "description": "Ingestion av kommunwebb (crawl, extrahera text, spara i Supabase).",
+  "private": true,
+  "type": "module",
+  "main": "ingest.js",
+  "scripts": {
+    "ingest": "node ingest.js",
+    "start": "node server.js",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "server": "node server.js",
+    "vercel-build": "vite build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ingest",
+    "crawler",
+    "supabase",
+    "readability",
+    "kommun",
+    "RAG"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "@supabase/supabase-js": "^2.79.0",
+    "axios": "^1.13.2",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "jsdom": "^27.1.0",
+    "openai": "^6.8.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.11"
+  }
+}

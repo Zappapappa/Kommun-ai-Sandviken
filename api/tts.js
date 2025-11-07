@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { text } = req.body;
+    const { text, language = 'sv' } = req.body;
     
     if (!text) {
       return res.status(400).json({ error: 'Missing text parameter' });
@@ -26,9 +26,12 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Azure credentials not configured' });
     }
 
+    // Select voice based on language
+    const voiceName = language === 'en' ? 'en-GB-LibbyNeural' : 'sv-SE-SofieNeural';
+    const xmlLang = language === 'en' ? 'en-GB' : 'sv-SE';
+
     // Use Azure REST API instead of SDK
-    // Using Sofie Neural voice (note: Sofie, not Sofia!)
-    const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='sv-SE'><voice name='sv-SE-SofieNeural'>${text}</voice></speak>`;
+    const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${xmlLang}'><voice name='${voiceName}'>${text}</voice></speak>`;
 
     const response = await fetch(
       `https://${speechRegion}.tts.speech.microsoft.com/cognitiveservices/v1`,

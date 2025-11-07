@@ -201,7 +201,7 @@ export default function SearchWidget({
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, language }),
       });
 
       if (!res.ok) throw new Error('TTS failed');
@@ -266,25 +266,15 @@ export default function SearchWidget({
             }
           }
           
-          @keyframes pulse {
-            0%, 100% {
+          @keyframes bounce {
+            0%, 80%, 100% {
+              transform: scale(0);
+              opacity: 0.5;
+            }
+            40% {
+              transform: scale(1);
               opacity: 1;
             }
-            50% {
-              opacity: 0.4;
-            }
-          }
-          
-          .loading-dot {
-            animation: pulse 1.4s ease-in-out infinite;
-          }
-          
-          .loading-dot:nth-child(2) {
-            animation-delay: 0.2s;
-          }
-          
-          .loading-dot:nth-child(3) {
-            animation-delay: 0.4s;
           }
         `}
       </style>
@@ -338,6 +328,7 @@ export default function SearchWidget({
               
               {/* Language selector */}
               <div style={styles.languageSelector}>
+                <span style={styles.languageLabel}>Välj språk:</span>
                 <button
                   onClick={() => setLanguage('sv')}
                   style={{
@@ -346,7 +337,8 @@ export default function SearchWidget({
                   }}
                   title="Svenska"
                 >
-                  🇸🇪
+                  <span style={styles.flagIcon}>🇸🇪</span>
+                  <span style={styles.languageText}>Svenska</span>
                 </button>
                 <button
                   onClick={() => setLanguage('en')}
@@ -356,7 +348,8 @@ export default function SearchWidget({
                   }}
                   title="English"
                 >
-                  🇬🇧
+                  <span style={styles.flagIcon}>🇬🇧</span>
+                  <span style={styles.languageText}>English</span>
                 </button>
               </div>
 
@@ -433,13 +426,13 @@ export default function SearchWidget({
                 ))}
 
                 {loading && (
-                  <div style={styles.answerBubble}>
-                    <p style={styles.loadingText}>
-                      Söker
-                      <span className="loading-dot">.</span>
-                      <span className="loading-dot">.</span>
-                      <span className="loading-dot">.</span>
-                    </p>
+                  <div style={styles.loadingBubble}>
+                    <div style={styles.loadingSpinner}>
+                      <div style={{...styles.spinnerDot, animationDelay: '0s'}}></div>
+                      <div style={{...styles.spinnerDot, animationDelay: '0.16s'}}></div>
+                      <div style={{...styles.spinnerDot, animationDelay: '0.32s'}}></div>
+                    </div>
+                    <p style={styles.loadingText}>Söker...</p>
                   </div>
                 )}
 
@@ -605,24 +598,46 @@ const styles = {
   },
   languageSelector: {
     display: 'flex',
-    gap: '8px',
+    alignItems: 'center',
+    gap: '12px',
     marginLeft: 'auto',
     marginRight: '16px',
+    padding: '8px 16px',
+    background: '#f8fafc',
+    borderRadius: '12px',
+    border: '1px solid #e2e8f0',
+  },
+  languageLabel: {
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#64748b',
+    marginRight: '4px',
   },
   languageButton: {
-    background: 'none',
-    border: '2px solid transparent',
-    fontSize: '24px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    background: '#fff',
+    border: '2px solid #e2e8f0',
     cursor: 'pointer',
-    padding: '4px 8px',
+    padding: '6px 12px',
     borderRadius: '8px',
     transition: 'all 0.2s',
-    opacity: 0.5,
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#64748b',
   },
   languageButtonActive: {
-    opacity: 1,
     borderColor: '#216c9e',
     background: '#f0f9ff',
+    color: '#216c9e',
+    boxShadow: '0 0 0 3px rgba(33, 108, 158, 0.1)',
+  },
+  flagIcon: {
+    fontSize: '18px',
+  },
+  languageText: {
+    fontSize: '13px',
   },
   closeButton: {
     background: 'none',
@@ -735,9 +750,35 @@ const styles = {
     justifyContent: 'center',
     transition: 'background 0.2s',
   },
+  loadingBubble: {
+    alignSelf: 'flex-start',
+    maxWidth: '200px',
+    background: '#f0f4f8',
+    padding: '20px 24px',
+    borderRadius: '18px 18px 18px 4px',
+    marginBottom: '8px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  loadingSpinner: {
+    display: 'flex',
+    gap: '8px',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  spinnerDot: {
+    width: '10px',
+    height: '10px',
+    borderRadius: '50%',
+    background: '#216c9e',
+    animation: 'bounce 1.4s infinite ease-in-out both',
+  },
   loadingText: {
-    fontSize: '15px',
-    color: '#718096',
+    fontSize: '14px',
+    color: '#64748b',
+    fontWeight: '500',
     textAlign: 'center',
     margin: 0,
   },

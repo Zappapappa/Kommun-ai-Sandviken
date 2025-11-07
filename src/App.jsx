@@ -25,6 +25,7 @@ export default function App() {
             /* Modal full-screen on mobile */
             .ai-modal-header { flex-wrap: wrap !important; align-items: center !important; gap:8px !important; }
             .ai-lang-selector { flex-wrap: wrap; gap:8px !important; }
+            .ai-lang-text { display: none !important; }
             .ai-modal-title { font-size:16px !important; }
             .ai-modal-body { padding:16px !important; }
             .ai-modal-footer { padding:12px 16px !important; }

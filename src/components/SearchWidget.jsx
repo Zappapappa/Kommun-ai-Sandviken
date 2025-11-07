@@ -100,7 +100,7 @@ export default function SearchWidget({
     if (typeof window !== 'undefined') {
       try { localStorage.setItem('ai_lang', language); } catch {}
     }
-    if (language === 'en') translateAnswers();
+    if (language === 'en' && chatHistory.length > 0) translateAnswers();
   }, [language]);
 
   const translateAnswers = async () => {
@@ -113,6 +113,7 @@ export default function SearchWidget({
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ text: item.text, targetLang: 'en' }),
             });
+            if (!res.ok) throw new Error('Translation failed');
             const data = await res.json();
             return { ...item, translatedText: data.translatedText };
           } catch (err) {
@@ -256,14 +257,31 @@ export default function SearchWidget({
         audioElRef.current.src = `data:audio/mp3;base64,${data.audio}`;
         // Ensure inline playback on mobile
         audioElRef.current.setAttribute('playsinline', 'true');
+        audioElRef.current.setAttribute('webkit-playsinline', 'true');
         audioElRef.current.load();
-        const playPromise = audioElRef.current.play();
-        if (playPromise && typeof playPromise.then === 'function') {
-          await playPromise.catch((err) => {
-            console.warn('Audio play blocked, falling back to new Audio()', err);
-          });
+        
+        // Set event handler before playing
+        audioElRef.current.onended = () => {
+          setPlayingIndex(null);
+        };
+        
+        // Try to play with better error handling for mobile
+        try {
+          const playPromise = audioElRef.current.play();
+          if (playPromise !== undefined) {
+            await playPromise;
+          }
+        } catch (playErr) {
+          console.error('Play failed, trying fallback:', playErr);
+          // Fallback to new Audio() on mobile if persistent element fails
+          const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
+          audioRef.current = audio;
+          audio.onended = () => {
+            setPlayingIndex(null);
+            audioRef.current = null;
+          };
+          await audio.play();
         }
-        audioElRef.current.onended = () => setPlayingIndex(null);
       } else {
         // Fallback: create new Audio object (desktop)
         const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
@@ -396,7 +414,7 @@ export default function SearchWidget({
                   title="Svenska"
                 >
                   <span style={styles.flagIcon}>🇸🇪</span>
-                  <span style={styles.languageText}>Svenska</span>
+                  <span style={styles.languageText} className="ai-lang-text">Svenska</span>
                 </button>
                 <button
                   onClick={() => setLanguage('en')}
@@ -407,7 +425,7 @@ export default function SearchWidget({
                   title="English"
                 >
                   <span style={styles.flagIcon}>🇬🇧</span>
-                  <span style={styles.languageText}>English</span>
+                  <span style={styles.languageText} className="ai-lang-text">English</span>
                 </button>
               </div>
 

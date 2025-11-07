@@ -34,9 +34,9 @@ export default async function handler(req, res) {
 
     // 2. Search in Supabase
     const { data: chunks, error } = await supabase.rpc('match_chunks', {
-      query_embedding: queryEmbedding,
-      match_threshold: 0.35,
       match_count: 5,
+      query_embedding: queryEmbedding,
+      similarity_threshold: 0.35,
     });
 
     if (error) throw error;

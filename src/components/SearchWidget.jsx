@@ -732,7 +732,7 @@ const styles = {
     alignItems: 'center',
     gap: '6px',
     background: '#fff',
-    border: '2px solid #e2e8f0',
+    border: '1px solid #e2e8f0',
     cursor: 'pointer',
     padding: '8px 12px',
     borderRadius: '8px',
@@ -744,7 +744,7 @@ const styles = {
     whiteSpace: 'nowrap',
   },
   languageButtonActive: {
-    border: '2px solid #216c9e',
+    border: '3px solid #216c9e',
     background: '#216c9e',
     color: '#fff',
     fontWeight: '600',

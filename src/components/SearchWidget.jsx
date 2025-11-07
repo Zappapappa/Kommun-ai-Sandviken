@@ -30,6 +30,7 @@ export default function SearchWidget({
   const [chatHistory, setChatHistory] = useState([]);
   const [error, setError] = useState('');
   const [playingIndex, setPlayingIndex] = useState(null);
+  const [language, setLanguage] = useState('sv'); // 'sv' or 'en'
   const audioRef = useRef(null);
   const closeButtonRef = useRef(null);
   const previouslyFocusedElementRef = useRef(null);
@@ -85,6 +86,36 @@ export default function SearchWidget({
       }, 100);
     }
   }, [chatHistory]);
+
+  // Translate answers when language changes
+  useEffect(() => {
+    if (language === 'en') {
+      translateAnswers();
+    }
+  }, [language]);
+
+  const translateAnswers = async () => {
+    const updatedHistory = await Promise.all(
+      chatHistory.map(async (item) => {
+        if (item.type === 'answer' && !item.translatedText) {
+          try {
+            const res = await fetch('/api/translate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text: item.text, targetLang: 'en' }),
+            });
+            const data = await res.json();
+            return { ...item, translatedText: data.translatedText };
+          } catch (err) {
+            console.error('Translation error:', err);
+            return item;
+          }
+        }
+        return item;
+      })
+    );
+    setChatHistory(updatedHistory);
+  };
 
   // Sök-funktion
   const handleSearch = async () => {
@@ -304,11 +335,37 @@ export default function SearchWidget({
               <h2 id="modal-title" style={styles.modalTitle}>
                 {title}
               </h2>
+              
+              {/* Language selector */}
+              <div style={styles.languageSelector}>
+                <button
+                  onClick={() => setLanguage('sv')}
+                  style={{
+                    ...styles.languageButton,
+                    ...(language === 'sv' ? styles.languageButtonActive : {})
+                  }}
+                  title="Svenska"
+                >
+                  🇸🇪
+                </button>
+                <button
+                  onClick={() => setLanguage('en')}
+                  style={{
+                    ...styles.languageButton,
+                    ...(language === 'en' ? styles.languageButtonActive : {})
+                  }}
+                  title="English"
+                >
+                  🇬🇧
+                </button>
+              </div>
+
               <button
                 onClick={() => {
                   setOpen(false);
                   setChatHistory([]);
                   setError('');
+                  setLanguage('sv');
                 }}
                 aria-label="Stäng"
                 style={styles.closeButton}
@@ -332,9 +389,14 @@ export default function SearchWidget({
                     {item.type === 'answer' && (
                       <div style={styles.answerBubble}>
                         <div style={styles.answerHeader}>
-                          <p style={styles.answerText}>{item.text}</p>
+                          <p style={styles.answerText}>
+                            {language === 'en' && item.translatedText ? item.translatedText : item.text}
+                          </p>
                           <button
-                            onClick={() => handlePlayAudio(item.text, index)}
+                            onClick={() => handlePlayAudio(
+                              language === 'en' && item.translatedText ? item.translatedText : item.text,
+                              index
+                            )}
                             style={styles.playButton}
                             title="Lyssna på svaret"
                             aria-label="Spela upp svar"
@@ -539,6 +601,28 @@ const styles = {
     fontWeight: '600',
     color: '#1a202c',
     margin: 0,
+    flex: 1,
+  },
+  languageSelector: {
+    display: 'flex',
+    gap: '8px',
+    marginLeft: 'auto',
+    marginRight: '16px',
+  },
+  languageButton: {
+    background: 'none',
+    border: '2px solid transparent',
+    fontSize: '24px',
+    cursor: 'pointer',
+    padding: '4px 8px',
+    borderRadius: '8px',
+    transition: 'all 0.2s',
+    opacity: 0.5,
+  },
+  languageButtonActive: {
+    opacity: 1,
+    borderColor: '#216c9e',
+    background: '#f0f9ff',
   },
   closeButton: {
     background: 'none',

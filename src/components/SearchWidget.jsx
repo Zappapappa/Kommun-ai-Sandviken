@@ -36,9 +36,7 @@ export default function SearchWidget({
     }
     return 'sv';
   }); // 'sv' or 'en'
-  // Dedicated audio element for better mobile support
-  const audioElRef = useRef(null);
-  // Keep a reference to any currently used Audio object (desktop fallback)
+  // Keep a reference to any currently used Audio object
   const audioRef = useRef(null);
   const closeButtonRef = useRef(null);
   const previouslyFocusedElementRef = useRef(null);
@@ -100,21 +98,31 @@ export default function SearchWidget({
     if (typeof window !== 'undefined') {
       try { localStorage.setItem('ai_lang', language); } catch {}
     }
-    if (language === 'en' && chatHistory.length > 0) translateAnswers();
+    if (language === 'en' && chatHistory.length > 0) {
+      console.log('Language switched to EN, translating existing answers...');
+      translateAnswers();
+    }
   }, [language]);
 
   const translateAnswers = async () => {
+    console.log('translateAnswers called, chatHistory length:', chatHistory.length);
     const updatedHistory = await Promise.all(
       chatHistory.map(async (item) => {
         if (item.type === 'answer' && !item.translatedText) {
+          console.log('Translating existing answer...');
           try {
             const res = await fetch('/api/translate', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ text: item.text, targetLang: 'en' }),
             });
-            if (!res.ok) throw new Error('Translation failed');
+            if (!res.ok) {
+              const errorText = await res.text();
+              console.error('Translation API error:', errorText);
+              throw new Error('Translation failed');
+            }
             const data = await res.json();
+            console.log('Translation successful for existing answer');
             return { ...item, translatedText: data.translatedText };
           } catch (err) {
             console.error('Translation error:', err);
@@ -187,18 +195,24 @@ export default function SearchWidget({
       // If English is selected, translate the answer immediately so follow-ups stay in EN
       let translatedText = null;
       if (language === 'en' && safeAnswer) {
+        console.log('Translating answer to English...');
         try {
           const tRes = await fetch('/api/translate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: safeAnswer, targetLang: 'en' }),
           });
+          console.log('Translation response status:', tRes.status);
           if (tRes.ok) {
             const tData = await tRes.json();
             translatedText = tData.translatedText || null;
+            console.log('Translation successful:', translatedText ? 'Yes' : 'No');
+          } else {
+            const errorText = await tRes.text();
+            console.error('Translation API error:', errorText);
           }
         } catch (e) {
-          console.warn('Failed to translate answer to EN:', e);
+          console.error('Failed to translate answer to EN:', e);
         }
       }
 
@@ -231,9 +245,11 @@ export default function SearchWidget({
   // TTS - Spela upp text
   const handlePlayAudio = async (text, index) => {
     try {
-      // Stop currently playing audio (both strategies)
-      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
-      if (audioElRef.current) { audioElRef.current.pause(); }
+      // Stop currently playing audio
+      if (audioRef.current) { 
+        audioRef.current.pause(); 
+        audioRef.current = null; 
+      }
 
       if (playingIndex === index) {
         setPlayingIndex(null);
@@ -248,52 +264,36 @@ export default function SearchWidget({
         body: JSON.stringify({ text, language }),
       });
 
-      if (!res.ok) throw new Error('TTS failed');
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error('TTS API error:', errorData);
+        throw new Error('TTS failed');
+      }
 
       const data = await res.json();
-
-      // Prefer a persistent <audio> element for mobile reliability
-      if (audioElRef.current) {
-        audioElRef.current.src = `data:audio/mp3;base64,${data.audio}`;
-        // Ensure inline playback on mobile
-        audioElRef.current.setAttribute('playsinline', 'true');
-        audioElRef.current.setAttribute('webkit-playsinline', 'true');
-        audioElRef.current.load();
-        
-        // Set event handler before playing
-        audioElRef.current.onended = () => {
-          setPlayingIndex(null);
-        };
-        
-        // Try to play with better error handling for mobile
-        try {
-          const playPromise = audioElRef.current.play();
-          if (playPromise !== undefined) {
-            await playPromise;
-          }
-        } catch (playErr) {
-          console.error('Play failed, trying fallback:', playErr);
-          // Fallback to new Audio() on mobile if persistent element fails
-          const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
-          audioRef.current = audio;
-          audio.onended = () => {
-            setPlayingIndex(null);
-            audioRef.current = null;
-          };
-          await audio.play();
-        }
-      } else {
-        // Fallback: create new Audio object (desktop)
-        const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
-        audioRef.current = audio;
-        audio.onended = () => {
-          setPlayingIndex(null);
-          audioRef.current = null;
-        };
-        await audio.play();
-      }
+      
+      // Always use new Audio() for Android Chrome compatibility
+      // Creating new Audio in click handler ensures user gesture is respected
+      const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
+      audio.setAttribute('playsinline', 'true');
+      audioRef.current = audio;
+      
+      audio.onended = () => {
+        setPlayingIndex(null);
+        audioRef.current = null;
+      };
+      
+      audio.onerror = (e) => {
+        console.error('Audio playback error:', e);
+        setPlayingIndex(null);
+        audioRef.current = null;
+      };
+      
+      // Play immediately - user gesture is from button click
+      await audio.play();
     } catch (err) {
       console.error('Audio error:', err);
+      alert('Kunde inte spela upp ljud. Fel: ' + err.message);
       setPlayingIndex(null);
     }
   };
@@ -544,8 +544,6 @@ export default function SearchWidget({
               >
                 ➤
               </button>
-              {/* Hidden audio element for reliable mobile playback */}
-              <audio ref={audioElRef} style={{ display: 'none' }} preload="none" />
             </div>
           </div>
         </div>

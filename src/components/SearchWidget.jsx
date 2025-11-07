@@ -120,6 +120,9 @@ export default function SearchWidget({
       const safeAnswer = (data.answer || '').trim();
       const safeSources = Array.isArray(data.sources) ? data.sources : [];
       
+      console.log('API Response:', data);
+      console.log('Sources:', safeSources);
+      
       // Lägg till svaret i chatten
       setChatHistory((prev) => [
         ...prev,
@@ -287,22 +290,26 @@ export default function SearchWidget({
                     {item.type === 'answer' && (
                       <div style={styles.answerBubble}>
                         <p style={styles.answerText}>{item.text}</p>
+                        {console.log('Rendering sources for answer:', item.sources)}
                         {item.sources && item.sources.length > 0 && (
                           <div style={styles.sourcesBox}>
                             <h4 style={styles.sourcesHeading}>Källor:</h4>
                             <ul style={styles.sourcesList}>
-                              {item.sources.map((src, i) => (
-                                <li key={i} style={styles.sourceItem}>
-                                  <a
-                                    href={src.url || src}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    style={styles.sourceLink}
-                                  >
-                                    {src.title || src.url || src}
-                                  </a>
-                                </li>
-                              ))}
+                              {item.sources.map((src, i) => {
+                                console.log('Source item:', src);
+                                return (
+                                  <li key={i} style={styles.sourceItem}>
+                                    <a
+                                      href={src.url || src}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      style={styles.sourceLink}
+                                    >
+                                      {src.title || src.url || src}
+                                    </a>
+                                  </li>
+                                );
+                              })}
                             </ul>
                           </div>
                         )}

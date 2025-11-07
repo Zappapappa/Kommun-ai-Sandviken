@@ -137,7 +137,7 @@ const styles = {
     padding: '0 20px',
     textAlign: 'center',
     position: 'relative',
-    top: '30px',
+    top: '0px',
     left: '-290px',
   },
   heroTitle: {

@@ -159,18 +159,24 @@ export default function SearchWidget({
       // Om språket är engelska, översätt frågan till svenska först
       let questionToSearch = userQuestion;
       if (language === 'en') {
+        console.log('User language is EN, translating question to SV...');
         try {
           const translateRes = await fetch('/api/translate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: userQuestion, targetLang: 'sv' }),
           });
+          console.log('Question translation response status:', translateRes.status);
           if (translateRes.ok) {
             const translateData = await translateRes.json();
             questionToSearch = translateData.translatedText || userQuestion;
+            console.log('Question translated to:', questionToSearch);
+          } else {
+            const errorText = await translateRes.text();
+            console.error('Question translation failed:', errorText);
           }
         } catch (translateErr) {
-          console.error('Translation failed, using original question:', translateErr);
+          console.error('Translation request failed:', translateErr);
         }
       }
 
@@ -258,6 +264,7 @@ export default function SearchWidget({
 
       setPlayingIndex(index);
 
+      console.log('Fetching TTS audio for language:', language);
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -265,12 +272,18 @@ export default function SearchWidget({
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
         console.error('TTS API error:', errorData);
-        throw new Error('TTS failed');
+        throw new Error(errorData.error || 'TTS failed');
       }
 
       const data = await res.json();
+      
+      if (!data.audio) {
+        throw new Error('No audio data received');
+      }
+      
+      console.log('TTS audio received, playing...');
       
       // Always use new Audio() for Android Chrome compatibility
       // Creating new Audio in click handler ensures user gesture is respected
@@ -279,6 +292,7 @@ export default function SearchWidget({
       audioRef.current = audio;
       
       audio.onended = () => {
+        console.log('Audio playback ended');
         setPlayingIndex(null);
         audioRef.current = null;
       };
@@ -287,10 +301,12 @@ export default function SearchWidget({
         console.error('Audio playback error:', e);
         setPlayingIndex(null);
         audioRef.current = null;
+        alert('Fel vid uppspelning av ljud');
       };
       
       // Play immediately - user gesture is from button click
       await audio.play();
+      console.log('Audio playing successfully');
     } catch (err) {
       console.error('Audio error:', err);
       alert('Kunde inte spela upp ljud. Fel: ' + err.message);

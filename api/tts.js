@@ -30,8 +30,24 @@ export default async function handler(req, res) {
     const voiceName = language === 'en' ? 'en-GB-LibbyNeural' : 'sv-SE-SofieNeural';
     const xmlLang = language === 'en' ? 'en-GB' : 'sv-SE';
 
+    // Escape XML special characters
+    const escapeXml = (unsafe) => {
+      return unsafe.replace(/[<>&'"]/g, (c) => {
+        switch (c) {
+          case '<': return '&lt;';
+          case '>': return '&gt;';
+          case '&': return '&amp;';
+          case '\'': return '&apos;';
+          case '"': return '&quot;';
+          default: return c;
+        }
+      });
+    };
+
+    const escapedText = escapeXml(text);
+
     // Use Azure REST API instead of SDK
-    const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${xmlLang}'><voice name='${voiceName}'>${text}</voice></speak>`;
+    const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${xmlLang}'><voice name='${voiceName}'>${escapedText}</voice></speak>`;
 
     const response = await fetch(
       `https://${speechRegion}.tts.speech.microsoft.com/cognitiveservices/v1`,
@@ -50,7 +66,7 @@ export default async function handler(req, res) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Azure TTS error details:', errorText);
-      throw new Error(`Azure TTS failed: ${response.status} - ${errorText}`);
+      return res.status(500).json({ error: `Azure TTS failed: ${response.status}` });
     }
 
     // Get audio as array buffer and convert to base64
@@ -64,6 +80,6 @@ export default async function handler(req, res) {
 
   } catch (err) {
     console.error('TTS error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message || 'TTS failed' });
   }
 }

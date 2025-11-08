@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
  * SearchWidget – Återanvändbar sök-modal för kommuner.
  *
  * Viktiga props:
- *   - apiUrl: endpoint för sök-API (default "/search").
+ *   - apiUrl: endpoint för sök-API (default "/api/search-v2").
  *   - title: titel i modalen (default "Kommun-sök (demo)").
  *   - heading: rubrik i widgetens header (default samma som title).
  *   - initialQuery: förifylld fråga.

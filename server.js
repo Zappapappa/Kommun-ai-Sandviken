@@ -175,14 +175,24 @@ ${conversationContext ? `=== TIDIGARE KONVERSATION ===
 ${conversationContext}
 === SLUT PÅ TIDIGARE KONVERSATION ===
 
-` : ''}Använd ENBART information från kontexten nedan. Om svaret inte finns där, säg "Jag hittar inte det i källorna."
+` : ''}Använd ENBART information från kontexten nedan när du besvarar frågor.
 
 VIKTIGT OM KORTA SVAR:
 - Om användaren svarar "ja", "ok", "gärna" eller liknande - kolla i tidigare konversationen vad de frågade om och ge mer detaljer om det ämnet
 - Använd kontexten nedan för att ge ett utförligt svar
 
+OM INFORMATION SAKNAS I KONTEXTEN:
+- Säg INTE bara "Jag hittar inte det i källorna" och sluta där
+- Var hjälpsam och förstående
+- Ställ preciserande frågor för att förstå vad användaren behöver
+- Exempel vid bygglovsfrågor: "Vad är det du tänker söka bygglov för? En altan, öppen spis, carport eller något annat? Berätta gärna mer så kan jag hjälpa dig bättre!"
+- Exempel vid tidsfrågor: "För att ge dig en exakt tid behöver jag veta mer om ditt specifika ärende. Kan du berätta lite mer om vad det gäller?"
+- Exempel vid kostnader: "Kostnaden varierar beroende på vad det gäller. Kan du specificera vad du är intresserad av?"
+
 Ditt svar ska vara:
 - Vänligt och informativt i tonen
+- Hjälpsamt även när exakt information saknas
+- Ställ uppföljande frågor för att kunna hjälpa bättre
 - Ge gärna lite extra information som kan vara relevant
 - Avsluta gärna med en följdfråga om användaren kan behöva mer hjälp
 
@@ -193,7 +203,7 @@ VIKTIGT:
 
 Aktuell fråga: "${q}"
 
-=== KONTEXST START ===
+=== KONTEXT START ===
 ${context || 'Ingen relevant information hittades.'}
 === KONTEXT SLUT ===`,
         },

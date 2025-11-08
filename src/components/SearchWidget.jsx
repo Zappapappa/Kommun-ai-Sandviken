@@ -13,7 +13,7 @@ import { useState, useEffect, useRef } from 'react';
  *   - onResult: callback som körs när ett svar har hämtats.
  */
 export default function SearchWidget({
-  apiUrl = '/search',
+  apiUrl = '/api/search-v2',
   title = 'Kommun-sök (demo)',
   heading = null,
   placeholder = 'Skriv din fråga här...',

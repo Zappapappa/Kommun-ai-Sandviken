@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
+import { logQuery, getOrCreateSessionId, getClientIP } from '../lib/logging.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -64,9 +65,16 @@ export default async function handler(req, res) {
   }
 
   try {
+    const startTime = Date.now();
     const q = (req.query.q || '').toString().trim();
     
     if (!q) return res.status(400).json({ error: 'Missing q' });
+
+    // Hämta session ID och användare info
+    const sessionId = getOrCreateSessionId(req);
+    const clientIP = getClientIP(req);
+    const userAgent = req.headers['user-agent'];
+    const userLanguage = req.query.lang || req.headers['accept-language']?.split(',')[0]?.split('-')[0] || 'sv';
 
     // Hämta konversationshistorik från frontend
     let chatHistory = [];
@@ -218,7 +226,35 @@ ${context || 'Ingen relevant information hittades.'}
       category: data.category,
     }));
 
-    console.log(`✅ Response generated with ${sources.length} sources`);
+    const responseTime = Date.now() - startTime;
+    console.log(`✅ Response generated in ${responseTime}ms with ${sources.length} sources`);
+
+    // Logga query till databas (kör async utan att vänta)
+    const tenantId = process.env.TENANT_ID; // Sandvikens tenant ID från .env
+    
+    logQuery({
+      tenantId,
+      query: q,
+      category: detectedCategory,
+      answer,
+      sources,
+      
+      // Token counts från OpenAI responses
+      embeddingTokens: embeddingResponse.usage?.total_tokens || 0,
+      promptTokens: completion.usage?.prompt_tokens || 0,
+      responseTokens: completion.usage?.completion_tokens || 0,
+      
+      // Prestanda
+      responseTime,
+      chunksFound: chunks?.length || 0,
+      similarityThreshold: 0.35,
+      
+      // Användare (anonymiserat)
+      sessionId,
+      userLanguage,
+      userAgent,
+      ipAddress: clientIP,
+    }).catch(err => console.error('Logging failed (non-blocking):', err));
 
     res.status(200).json({ 
       answer, 
@@ -227,6 +263,8 @@ ${context || 'Ingen relevant information hittades.'}
         version: 'v2',
         detected_category: detectedCategory,
         chunks_found: chunks?.length || 0,
+        response_time_ms: responseTime,
+        session_id: sessionId, // Skicka tillbaka för feedback
       }
     });
   } catch (err) {

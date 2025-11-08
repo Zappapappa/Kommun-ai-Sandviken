@@ -79,16 +79,18 @@ export default async function handler(req, res) {
     // Kolla om detta är en kort följdfråga (ja, ok, etc)
     const isShortFollowUp = q.match(/^(ja|nej|ok|gärna|kanske|inte|visst|absolut)$/i);
     
-    // Automatisk kategoridetektion (skippa vid korta följdfrågor)
+    // Automatisk kategoridetektion
     let detectedCategory = null;
-    if (!isShortFollowUp && chatHistory.length > 0) {
-      // För följdfrågor: använd samma kategori som i tidigare konversation
-      // genom att titta på senaste substantiva frågan
+    
+    if (isShortFollowUp && chatHistory.length > 0) {
+      // För "ja", "ok" etc: använd samma kategori som i tidigare konversation
       const lastRealQuestion = chatHistory.filter(h => h.type === 'question' && h.text.length > 10).pop();
       if (lastRealQuestion) {
         detectedCategory = detectCategoryFromQuery(lastRealQuestion.text);
+        console.log(`📌 Follow-up detected, reusing category from: "${lastRealQuestion.text}"`);
       }
     } else if (!isShortFollowUp) {
+      // Normal fråga: detektera kategori från själva frågan
       detectedCategory = detectCategoryFromQuery(q);
     }
     

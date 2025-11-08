@@ -434,7 +434,7 @@ export default function SearchWidget({
               
               {/* Language selector */}
               <div style={styles.languageSelector} className="ai-lang-selector">
-                <span style={styles.languageLabel}>Välj språk:</span>
+                <span style={styles.languageLabel}>Språk:</span>
                 <button
                   onClick={() => setLanguage('sv')}
                   style={{
@@ -443,7 +443,7 @@ export default function SearchWidget({
                   }}
                   title="Svenska"
                 >
-                  <span style={styles.flagIcon}>🇸🇪</span>
+                  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 10'%3E%3Crect width='16' height='10' fill='%23006AA7'/%3E%3Crect width='2' height='10' x='5' fill='%23FECC00'/%3E%3Crect width='16' height='2' y='4' fill='%23FECC00'/%3E%3C/svg%3E" alt="SE" style={{width: '20px', height: '14px'}} />
                   <span style={styles.languageText} className="ai-lang-text">Svenska</span>
                 </button>
                 <button
@@ -454,7 +454,7 @@ export default function SearchWidget({
                   }}
                   title="English"
                 >
-                  <span style={styles.flagIcon}>🇬🇧</span>
+                  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 30'%3E%3Crect width='60' height='30' fill='%23012169'/%3E%3Cpath d='M0,0 L60,30 M60,0 L0,30' stroke='%23fff' stroke-width='6'/%3E%3Cpath d='M0,0 L60,30 M60,0 L0,30' stroke='%23C8102E' stroke-width='4'/%3E%3Cpath d='M30,0 v30 M0,15 h60' stroke='%23fff' stroke-width='10'/%3E%3Cpath d='M30,0 v30 M0,15 h60' stroke='%23C8102E' stroke-width='6'/%3E%3C/svg%3E" alt="GB" style={{width: '20px', height: '14px'}} />
                   <span style={styles.languageText} className="ai-lang-text">English</span>
                 </button>
               </div>
@@ -744,8 +744,8 @@ const styles = {
     whiteSpace: 'nowrap',
   },
   languageButtonActive: {
-    border: '3px solid #216c9e',
-    background: '#216c9e',
+    border: '1px solid #216c9e',
+    background: 'rgba(33, 108, 158, 0.5)',
     color: '#fff',
     fontWeight: '600',
   },

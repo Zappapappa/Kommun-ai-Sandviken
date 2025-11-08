@@ -79,9 +79,23 @@ app.get('/api/search-v2', async (req, res) => {
       console.log('Could not parse history:', e);
     }
 
-    // Automatisk kategoridetektion
-    const detectedCategory = detectCategoryFromQuery(q);
-    console.log(`🔍 Search v2 query: "${q}" ${detectedCategory ? `[auto-detected: ${detectedCategory}]` : '[all categories]'}`);
+    // Kolla om detta är en kort följdfråga (ja, ok, etc)
+    const isShortFollowUp = q.match(/^(ja|nej|ok|gärna|kanske|inte|visst|absolut)$/i);
+    
+    // Automatisk kategoridetektion (skippa vid korta följdfrågor)
+    let detectedCategory = null;
+    if (!isShortFollowUp && chatHistory.length > 0) {
+      // För följdfrågor: använd samma kategori som i tidigare konversation
+      // genom att titta på senaste substantiva frågan
+      const lastRealQuestion = chatHistory.filter(h => h.type === 'question' && h.text.length > 10).pop();
+      if (lastRealQuestion) {
+        detectedCategory = detectCategoryFromQuery(lastRealQuestion.text);
+      }
+    } else if (!isShortFollowUp) {
+      detectedCategory = detectCategoryFromQuery(q);
+    }
+    
+    console.log(`🔍 Search v2 query: "${q}" ${detectedCategory ? `[auto-detected: ${detectedCategory}]` : '[all categories]'} ${isShortFollowUp ? '(follow-up)' : ''}`);
 
     // 1. Create embedding for query
     const embeddingResponse = await openai.embeddings.create({

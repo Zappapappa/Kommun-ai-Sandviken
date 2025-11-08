@@ -48,7 +48,7 @@ export default function App() {
             {/* AI-sökwidget på samma plats som vanlig sökning */}
             <div style={styles.searchContainer}>
               <SearchWidget
-                apiUrl="/search"
+                apiUrl="/api/search-v2"
                 heading=""
                 title="AI-svar från sandviken.se"
                 placeholder="Ange sökord"

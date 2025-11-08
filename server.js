@@ -29,12 +29,12 @@ function detectCategoryFromQuery(query) {
   const q = query.toLowerCase();
   
   // Bygga, bo och miljö
-  if (q.match(/bygglov|ritning|bygga|hus|villa|altan|inglasning|tillbyggnad|fasad|carport|garage|attefallshus|tid tar/)) {
+  if (q.match(/bygglov|ritning|bygga|hus|villa|altan|inglasning|tillbyggnad|fasad|carport|garage|attefallshus/)) {
     return 'Bygga, bo och miljö';
   }
   
   // Omsorg och stöd
-  if (q.match(/hemtjänst|äldreomsorg|omsorg|stöd|personlig assistent|funktionsnedsättning|lss|boende|vård|kostar/)) {
+  if (q.match(/hemtjänst|äldreomsorg|omsorg|stöd|personlig assistent|funktionsnedsättning|lss|boende|vård/)) {
     return 'Omsorg och stöd';
   }
   
@@ -59,7 +59,7 @@ function detectCategoryFromQuery(query) {
   }
   
   // Kommun och politik
-  if (q.match(/kommun|politik|nämnd|styrelse|fullmäktige|kontakt/)) {
+  if (q.match(/kommun|politik|nämnd|styrelse|fullmäktige|kontakt|kommun/)) {
     return 'Kommun och politik';
   }
   
@@ -82,16 +82,18 @@ app.get('/api/search-v2', async (req, res) => {
     // Kolla om detta är en kort följdfråga (ja, ok, etc)
     const isShortFollowUp = q.match(/^(ja|nej|ok|gärna|kanske|inte|visst|absolut)$/i);
     
-    // Automatisk kategoridetektion (skippa vid korta följdfrågor)
+    // Automatisk kategoridetektion
     let detectedCategory = null;
-    if (!isShortFollowUp && chatHistory.length > 0) {
-      // För följdfrågor: använd samma kategori som i tidigare konversation
-      // genom att titta på senaste substantiva frågan
+    
+    if (isShortFollowUp && chatHistory.length > 0) {
+      // För "ja", "ok" etc: använd samma kategori som i tidigare konversation
       const lastRealQuestion = chatHistory.filter(h => h.type === 'question' && h.text.length > 10).pop();
       if (lastRealQuestion) {
         detectedCategory = detectCategoryFromQuery(lastRealQuestion.text);
+        console.log(`📌 Follow-up detected, reusing category from: "${lastRealQuestion.text}"`);
       }
     } else if (!isShortFollowUp) {
+      // Normal fråga: detektera kategori från själva frågan
       detectedCategory = detectCategoryFromQuery(q);
     }
     

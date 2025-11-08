@@ -7,6 +7,10 @@
       "destination": "/api/search"
     },
     {
+      "source": "/api/search-v2",
+      "destination": "/api/search-v2"
+    },
+    {
       "source": "/api/tts",
       "destination": "/api/tts"
     },

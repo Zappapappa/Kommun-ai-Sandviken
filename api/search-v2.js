@@ -68,9 +68,31 @@ export default async function handler(req, res) {
     
     if (!q) return res.status(400).json({ error: 'Missing q' });
 
-    // Automatisk kategoridetektion
-    const detectedCategory = detectCategoryFromQuery(q);
-    console.log(`🔍 Search v2 query: "${q}" ${detectedCategory ? `[auto-detected: ${detectedCategory}]` : '[all categories]'}`);
+    // Hämta konversationshistorik från frontend
+    let chatHistory = [];
+    try {
+      chatHistory = JSON.parse(req.query.history || '[]');
+    } catch (e) {
+      console.log('Could not parse history:', e);
+    }
+
+    // Kolla om detta är en kort följdfråga (ja, ok, etc)
+    const isShortFollowUp = q.match(/^(ja|nej|ok|gärna|kanske|inte|visst|absolut)$/i);
+    
+    // Automatisk kategoridetektion (skippa vid korta följdfrågor)
+    let detectedCategory = null;
+    if (!isShortFollowUp && chatHistory.length > 0) {
+      // För följdfrågor: använd samma kategori som i tidigare konversation
+      // genom att titta på senaste substantiva frågan
+      const lastRealQuestion = chatHistory.filter(h => h.type === 'question' && h.text.length > 10).pop();
+      if (lastRealQuestion) {
+        detectedCategory = detectCategoryFromQuery(lastRealQuestion.text);
+      }
+    } else if (!isShortFollowUp) {
+      detectedCategory = detectCategoryFromQuery(q);
+    }
+    
+    console.log(`🔍 Search v2 query: "${q}" ${detectedCategory ? `[auto-detected: ${detectedCategory}]` : '[all categories]'} ${isShortFollowUp ? '(follow-up)' : ''}`);
 
     // 1. Create embedding for query
     const embeddingResponse = await openai.embeddings.create({
@@ -125,7 +147,17 @@ export default async function handler(req, res) {
       }
     }
 
-    // 5. Get AI response
+    // 5. Bygg konversationskontext från historik
+    const conversationContext = chatHistory
+      .filter(h => h.type === 'question' || h.type === 'answer')
+      .map(h => {
+        if (h.type === 'question') return `Användare: ${h.text}`;
+        if (h.type === 'answer') return `Assistent: ${h.text}`;
+        return '';
+      })
+      .join('\n');
+
+    // 6. Get AI response with conversation context
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       temperature: 0.5,
@@ -134,13 +166,31 @@ export default async function handler(req, res) {
           role: 'system',
           content: `Du är en hjälpsam assistent för Sandvikens kommun. Svara direkt på frågan på svenska utan att börja med hälsningar som "Hej" eller liknande. Ge ett naturligt och hjälpsamt svar baserat på kontexten nedan. Avsluta gärna med en följdfråga om användaren behöver veta mer om något relaterat.
 
-VIKTIGT: Börja INTE svaret med "Hej" eller andra hälsningsfraser.
-VIKTIGT: Inkludera INTE käll-URL:er i ditt svar - dessa visas separat.
+${conversationContext ? `=== TIDIGARE KONVERSATION ===
+${conversationContext}
+=== SLUT PÅ TIDIGARE KONVERSATION ===
 
-Om användaren svarar "ja", "ok", "gärna" eller liknande - tolka det som att de vill ha mer information om det huvudämne som finns i kontexten.
+` : ''}Använd ENBART information från kontexten nedan. Om svaret inte finns där, säg "Jag hittar inte det i källorna."
 
-Kontext:
-${context || 'Ingen relevant information hittades.'}`,
+VIKTIGT OM KORTA SVAR:
+- Om användaren svarar "ja", "ok", "gärna" eller liknande - kolla i tidigare konversationen vad de frågade om och ge mer detaljer om det ämnet
+- Använd kontexten nedan för att ge ett utförligt svar
+
+Ditt svar ska vara:
+- Vänligt och informativt i tonen
+- Ge gärna lite extra information som kan vara relevant
+- Avsluta gärna med en följdfråga om användaren kan behöva mer hjälp
+
+VIKTIGT: 
+- Börja INTE svaret med "Hej" eller andra hälsningar
+- Inkludera INTE käll-URL:er i ditt svar (de visas separat)
+- Upprepa INTE frågan i ditt svar
+
+Aktuell fråga: "${q}"
+
+=== KONTEXT START ===
+${context || 'Ingen relevant information hittades.'}
+=== KONTEXT SLUT ===`,
         },
         {
           role: 'user',

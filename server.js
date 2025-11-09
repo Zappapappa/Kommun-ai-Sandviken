@@ -6,8 +6,12 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { logQuery, getOrCreateSessionId, getClientIP } from './lib/logging.js';
+import translateHandler from './api/translate.js';
 
 const app = express();
+
+// Body parser middleware för POST requests
+app.use(express.json());
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -232,10 +236,10 @@ ${context || 'Ingen relevant information hittades.'}
     const responseTime = Date.now() - startTime;
     console.log(`✅ Response generated in ${responseTime}ms with ${sources.length} sources`);
 
-    // Logga query till databas (kör async utan att vänta)
+    // Logga query till databas och få query_id
     const tenantId = process.env.TENANT_ID;
     
-    logQuery({
+    const queryLog = await logQuery({
       tenantId,
       query: q,
       category: detectedCategory,
@@ -254,7 +258,10 @@ ${context || 'Ingen relevant information hittades.'}
       userLanguage,
       userAgent,
       ipAddress: clientIP,
-    }).catch(err => console.error('Logging failed (non-blocking):', err));
+    }).catch(err => {
+      console.error('Logging failed (non-blocking):', err);
+      return null;
+    });
 
     res.status(200).json({ 
       answer, 
@@ -265,6 +272,7 @@ ${context || 'Ingen relevant information hittades.'}
         chunks_found: chunks?.length || 0,
         response_time_ms: responseTime,
         session_id: sessionId,
+        query_id: queryLog?.id, // Skicka tillbaka för feedback
       }
     });
   } catch (err) {
@@ -383,6 +391,45 @@ ${context}
     console.error(e);
     res.status(500).json({ error: e.message || 'Server error' });
   }
+});
+
+// Feedback endpoint
+app.post('/api/feedback', async (req, res) => {
+  try {
+    const { query_id, feedback } = req.body;
+    
+    if (!query_id || typeof query_id !== 'number') {
+      return res.status(400).json({ error: 'Missing or invalid query_id' });
+    }
+    
+    if (![1, -1].includes(feedback)) {
+      return res.status(400).json({ error: 'Feedback must be 1 (positive) or -1 (negative)' });
+    }
+
+    const { updateQueryFeedback } = await import('./lib/logging.js');
+    const success = await updateQueryFeedback(query_id, feedback);
+    
+    if (!success) {
+      return res.status(500).json({ error: 'Failed to update feedback' });
+    }
+
+    res.status(200).json({ 
+      success: true,
+      message: 'Feedback received',
+      query_id,
+      feedback 
+    });
+    
+  } catch (err) {
+    console.error('Feedback error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Translation endpoint (local dev)
+app.post('/api/translate', async (req, res) => {
+  // Reuse the serverless handler for consistency
+  return translateHandler(req, res);
 });
 
 // Servera statiska filer från dist/

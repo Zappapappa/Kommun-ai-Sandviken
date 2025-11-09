@@ -229,10 +229,10 @@ ${context || 'Ingen relevant information hittades.'}
     const responseTime = Date.now() - startTime;
     console.log(`✅ Response generated in ${responseTime}ms with ${sources.length} sources`);
 
-    // Logga query till databas (kör async utan att vänta)
-    const tenantId = process.env.TENANT_ID; // Sandvikens tenant ID från .env
+    // Logga query till databas och få query_id
+    const tenantId = process.env.TENANT_ID;
     
-    logQuery({
+    const queryLog = await logQuery({
       tenantId,
       query: q,
       category: detectedCategory,
@@ -254,7 +254,10 @@ ${context || 'Ingen relevant information hittades.'}
       userLanguage,
       userAgent,
       ipAddress: clientIP,
-    }).catch(err => console.error('Logging failed (non-blocking):', err));
+    }).catch(err => {
+      console.error('Logging failed (non-blocking):', err);
+      return null;
+    });
 
     res.status(200).json({ 
       answer, 
@@ -264,7 +267,8 @@ ${context || 'Ingen relevant information hittades.'}
         detected_category: detectedCategory,
         chunks_found: chunks?.length || 0,
         response_time_ms: responseTime,
-        session_id: sessionId, // Skicka tillbaka för feedback
+        session_id: sessionId,
+        query_id: queryLog?.id, // Skicka tillbaka för feedback
       }
     });
   } catch (err) {

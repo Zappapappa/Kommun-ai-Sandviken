@@ -19,8 +19,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing text parameter' });
     }
 
-    const translatorKey = process.env.AZURE_TRANSLATOR_KEY;
-    const translatorRegion = process.env.AZURE_TRANSLATOR_REGION;
+  const translatorKey = process.env.AZURE_TRANSLATOR_KEY;
+  const translatorRegion = process.env.AZURE_TRANSLATOR_REGION;
 
     if (!translatorKey || !translatorRegion) {
       console.error('Azure Translator credentials not found');

@@ -31,6 +31,7 @@ export default function SearchWidget({
   const [error, setError] = useState('');
   const [playingIndex, setPlayingIndex] = useState(null);
   const [language, setLanguage] = useState('sv'); // Always default to Swedish
+  const [feedbackStates, setFeedbackStates] = useState({}); // Track feedback per message { queryId: 1 | -1 }
   // Keep a reference to any currently used Audio object
   const audioRef = useRef(null);
   const closeButtonRef = useRef(null);
@@ -234,7 +235,13 @@ export default function SearchWidget({
       // Lägg till svaret i chatten (inkl. översättning om finns)
       setChatHistory((prev) => [
         ...prev,
-        { type: 'answer', text: safeAnswer, translatedText, sources: safeSources },
+        { 
+          type: 'answer', 
+          text: safeAnswer, 
+          translatedText, 
+          sources: safeSources,
+          queryId: data.metadata?.query_id, // Spara query_id för feedback
+        },
       ]);
 
       if (typeof onResult === 'function') {
@@ -254,6 +261,42 @@ export default function SearchWidget({
       setChatHistory((prev) => prev.slice(0, -1));
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Feedback - Thumbs up/down
+  const handleFeedback = async (queryId, feedback) => {
+    if (!queryId) {
+      console.error('No query_id available for feedback');
+      return;
+    }
+
+    // Prevent multiple submissions
+    if (feedbackStates[queryId] !== undefined) {
+      return;
+    }
+
+    // Optimistically update UI
+    setFeedbackStates(prev => ({ ...prev, [queryId]: feedback }));
+
+    try {
+      const res = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query_id: queryId, feedback }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Feedback failed');
+      }
+    } catch (err) {
+      console.error('Failed to submit feedback:', err);
+      // Revert on error
+      setFeedbackStates(prev => {
+        const newState = { ...prev };
+        delete newState[queryId];
+        return newState;
+      });
     }
   };
 
@@ -382,6 +425,34 @@ export default function SearchWidget({
               opacity: 1;
             }
           }
+          
+          /* Feedback buttons */
+          .feedback-btn {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 4px 10px;
+            font-size: 18px;
+            cursor: pointer;
+            outline: none;
+          }
+          .feedback-btn.feedback-active {
+            border: 2px solid #216c9e !important;
+          }
+          
+          /* Language buttons */
+          .ai-lang-selector button {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            color: #c9c9c9ff;
+          }
+          
+          .ai-lang-selector button.lang-active {
+            border: 2px solid #216c9e !important;
+            background: #fff !important;
+            color: #216c9e !important;
+            font-weight: 600 !important;
+          }
         `}
       </style>
       
@@ -437,10 +508,8 @@ export default function SearchWidget({
                 <span style={styles.languageLabel}>Språk:</span>
                 <button
                   onClick={() => setLanguage('sv')}
-                  style={{
-                    ...styles.languageButton,
-                    ...(language === 'sv' ? styles.languageButtonActive : {})
-                  }}
+                  style={styles.languageButton}
+                  className={language === 'sv' ? 'lang-active' : ''}
                   title="Svenska"
                 >
                   <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 10'%3E%3Crect width='16' height='10' fill='%23006AA7'/%3E%3Crect width='2' height='10' x='5' fill='%23FECC00'/%3E%3Crect width='16' height='2' y='4' fill='%23FECC00'/%3E%3C/svg%3E" alt="SE" style={{width: '20px', height: '14px'}} />
@@ -448,10 +517,8 @@ export default function SearchWidget({
                 </button>
                 <button
                   onClick={() => setLanguage('en')}
-                  style={{
-                    ...styles.languageButton,
-                    ...(language === 'en' ? styles.languageButtonActive : {})
-                  }}
+                  style={styles.languageButton}
+                  className={language === 'en' ? 'lang-active' : ''}
                   title="English"
                 >
                   <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 30'%3E%3Crect width='60' height='30' fill='%23012169'/%3E%3Cpath d='M0,0 L60,30 M60,0 L0,30' stroke='%23fff' stroke-width='6'/%3E%3Cpath d='M0,0 L60,30 M60,0 L0,30' stroke='%23C8102E' stroke-width='4'/%3E%3Cpath d='M30,0 v30 M0,15 h60' stroke='%23fff' stroke-width='10'/%3E%3Cpath d='M30,0 v30 M0,15 h60' stroke='%23C8102E' stroke-width='6'/%3E%3C/svg%3E" alt="GB" style={{width: '20px', height: '14px'}} />
@@ -510,6 +577,32 @@ export default function SearchWidget({
                             {playingIndex === index ? '⏸️' : '🔊'}
                           </button>
                         </div>
+                        
+                        {/* Feedback buttons */}
+                        {item.queryId && (
+                          <div style={styles.feedbackContainer}>
+                            <button
+                              onClick={() => handleFeedback(item.queryId, 1)}
+                              className={`feedback-btn ${feedbackStates[item.queryId] === 1 ? 'feedback-active' : ''}`}
+                              aria-label="Thumbs up"
+                              title="Bra svar"
+                            >
+                              👍
+                            </button>
+                            <button
+                              onClick={() => handleFeedback(item.queryId, -1)}
+                              className={`feedback-btn ${feedbackStates[item.queryId] === -1 ? 'feedback-active' : ''}`}
+                              aria-label="Thumbs down"
+                              title="Dåligt svar"
+                            >
+                              👎
+                            </button>
+                            {feedbackStates[item.queryId] !== undefined && (
+                              <span style={styles.feedbackThanks}>Tack för din feedback</span>
+                            )}
+                          </div>
+                        )}
+                        
                         {console.log('Rendering sources for answer:', item.sources)}
                         {item.sources && item.sources.length > 0 && (
                           <div style={styles.sourcesBox}>
@@ -662,7 +755,7 @@ const styles = {
     width: '20px',
     height: '20px',
     borderRadius: '6px',
-    background: 'rgba(255,255,255,0.3)',
+    background: '#fff',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -736,18 +829,11 @@ const styles = {
     cursor: 'pointer',
     padding: '8px 12px',
     borderRadius: '8px',
-    transition: 'all 0.2s',
     fontSize: '14px',
     fontWeight: '500',
     color: '#64748b',
     outline: 'none',
     whiteSpace: 'nowrap',
-  },
-  languageButtonActive: {
-    border: '1px solid #216c9e',
-    background: 'rgba(33, 108, 158, 0.5)',
-    color: '#fff',
-    fontWeight: '600',
   },
   flagIcon: {
     fontSize: '20px',
@@ -940,5 +1026,17 @@ const styles = {
     textDecoration: 'none',
     wordBreak: 'break-all',
     transition: 'color 0.2s',
+  },
+  feedbackContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    marginTop: '8px',
+  },
+  feedbackThanks: {
+    fontSize: '12px',
+    color: '#216c9e',
+    fontWeight: '600',
+    marginLeft: '4px',
   },
 };

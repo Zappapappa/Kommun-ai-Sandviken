@@ -13,6 +13,9 @@ const openai = new OpenAI({
   project: process.env.OPENAI_PROJECT_ID,
 });
 
+// Multi-tenant: Sandviken tenant ID
+const TENANT_ID = process.env.TENANT_ID || 'fda40f49-f0bf-47eb-b2dc-675e7385dc42';
+
 // Kategori-mappning baserat på URL
 function getCategoryFromUrl(url) {
   if (url.includes('/utbildningochforskola/')) return 'Utbildning och förskola';
@@ -56,22 +59,26 @@ async function embedChunksForPageV2(page, dryRun = false) {
   });
   const vectors = resp.data.map((d) => d.embedding);
 
-  // Rensa gamla chunks för denna page_id i v2-tabellen
-  await supabase.from('chunks_v2').delete().eq('page_id', page.id);
+  // Rensa gamla chunks för denna page_id i multi-tenant tabellen
+  await supabase.from('document_chunks')
+    .delete()
+    .eq('tenant_id', TENANT_ID)
+    .eq('page_id', page.id);
 
-  // Skapa chunks med metadata
+  // Skapa chunks med metadata (multi-tenant)
   const rows = chunks.map((content, idx) => ({
+    tenant_id: TENANT_ID,
     page_id: page.id,
     content,
     embedding: vectors[idx],
-    chunk_order: idx,
-    category, // NY: lägg till kategori i chunks
+    chunk_index: idx,
+    category,
   }));
 
   // Insert i batchar
   const batchSize = 200;
   for (let i = 0; i < rows.length; i += batchSize) {
-    const { error } = await supabase.from('chunks_v2').insert(rows.slice(i, i + batchSize));
+    const { error } = await supabase.from('document_chunks').insert(rows.slice(i, i + batchSize));
     if (error) throw error;
   }
 
@@ -83,10 +90,11 @@ async function run(dryRun = false) {
   console.log(`RAG v2 REINDEXERING ${dryRun ? '(DRY RUN - INGEN SKRIVNING)' : '(SKARP KÖRNING)'}`);
   console.log(`${'='.repeat(60)}\n`);
 
-  // Hämta alla pages från befintlig tabell
+  // Hämta alla pages från multi-tenant tabell
   const { data: pages, error } = await supabase
     .from('pages')
     .select('id, title, content, url')
+    .eq('tenant_id', TENANT_ID)
     .order('id', { ascending: true });
 
   if (error) throw error;
@@ -135,9 +143,9 @@ async function run(dryRun = false) {
 
   if (dryRun) {
     console.log('💡 Detta var en DRY RUN - ingen data skrevs till databasen.');
-    console.log('💡 Kör "node embed-v2.js --run" för att skriva till chunks_v2.\n');
+    console.log('💡 Kör "node embed-v2.js --run" för att skriva till document_chunks.\n');
   } else {
-    console.log('✅ Reindexering klar! Data finns nu i "chunks_v2"-tabellen.\n');
+    console.log('✅ Reindexering klar! Data finns nu i "document_chunks"-tabellen.\n');
   }
 }
 

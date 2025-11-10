@@ -13,6 +13,9 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+// Multi-tenant: Sandviken tenant ID
+const TENANT_ID = process.env.TENANT_ID || 'fda40f49-f0bf-47eb-b2dc-675e7385dc42';
+
 // 1) Hämta och rensa läsbar text
 async function fetchCleanPage(url) {
   const { data: html } = await axios.get(url, { timeout: 20000 });
@@ -25,11 +28,12 @@ async function fetchCleanPage(url) {
   return { url, title, content, hash };
 }
 
-// 2) Spara/upsert i Supabase (bara om ändrat)
+// 2) Spara/upsert i Supabase (bara om ändrat) - multi-tenant
 async function upsertPage(row) {
   const { data: existing, error: selErr } = await supabase
     .from("pages")
-    .select("hash")
+    .select("id, hash")
+    .eq("tenant_id", TENANT_ID)
     .eq("url", row.url)
     .maybeSingle();
 
@@ -39,8 +43,24 @@ async function upsertPage(row) {
     return;
   }
 
-  const { error } = await supabase.from("pages").upsert(row);
-  if (error) throw error;
+  // Lägg till tenant_id i row
+  const rowWithTenant = { ...row, tenant_id: TENANT_ID };
+  
+  if (existing) {
+    // Update existing row
+    const { error } = await supabase
+      .from("pages")
+      .update(rowWithTenant)
+      .eq("id", existing.id);
+    if (error) throw error;
+  } else {
+    // Insert new row
+    const { error } = await supabase
+      .from("pages")
+      .insert(rowWithTenant);
+    if (error) throw error;
+  }
+  
   console.log("✅ Sparad/uppdaterad:", row.title);
 }
 

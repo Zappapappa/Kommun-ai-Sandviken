@@ -29,6 +29,9 @@ const openai = new OpenAI({
   project: process.env.OPENAI_PROJECT_ID,
 });
 
+// Multi-tenant: Sandviken tenant ID
+const TENANT_ID = process.env.TENANT_ID || 'fda40f49-f0bf-47eb-b2dc-675e7385dc42';
+
 // Automatisk kategoridetektion baserat på nyckelord i frågan
 function detectCategoryFromQuery(query) {
   const q = query.toLowerCase();
@@ -118,11 +121,12 @@ app.get('/api/search-v2', async (req, res) => {
     });
     const queryEmbedding = embeddingResponse.data[0].embedding;
 
-    // 2. Search in Supabase using v2 RPC (with auto-detected category filter)
-    const { data: chunks, error } = await supabase.rpc('match_chunks_v2', {
+    // 2. Search in Supabase using multi-tenant RPC (with auto-detected category filter)
+    const { data: chunks, error } = await supabase.rpc('match_chunks', {
       query_embedding: queryEmbedding,
+      match_threshold: 0.35,
       match_count: 5,
-      similarity_threshold: 0.35,
+      tenant_id_param: TENANT_ID,
       filter_category: detectedCategory,
     });
 
@@ -133,11 +137,12 @@ app.get('/api/search-v2', async (req, res) => {
 
     console.log(`📦 Found ${chunks?.length || 0} chunks`);
 
-    // 3. Get page info for sources
+    // 3. Get page info for sources (multi-tenant)
     const pageIds = chunks ? [...new Set(chunks.map(c => c.page_id))] : [];
     const { data: pages } = await supabase
       .from('pages')
       .select('id, url, title')
+      .eq('tenant_id', TENANT_ID)
       .in('id', pageIds);
 
     // 4. Build context and sources (include category info)
@@ -237,10 +242,8 @@ ${context || 'Ingen relevant information hittades.'}
     console.log(`✅ Response generated in ${responseTime}ms with ${sources.length} sources`);
 
     // Logga query till databas och få query_id
-    const tenantId = process.env.TENANT_ID;
-    
     const queryLog = await logQuery({
-      tenantId,
+      tenantId: TENANT_ID,
       query: q,
       category: detectedCategory,
       answer,
@@ -304,19 +307,22 @@ app.get('/search', async (req, res) => {
     // 2) Top chunks via pg RPC
     const { data: matches, error } = await supabase.rpc('match_chunks', {
       query_embedding: queryEmbedding,
+      match_threshold: 0.35,
       match_count: 5,
-      similarity_threshold: 0.35,
+      tenant_id_param: TENANT_ID,
+      filter_category: null,
     });
     if (error) throw error;
     if (!matches?.length) {
       return res.json({ answer: 'Jag hittar inte det i källorna.', sources: [] });
     }
 
-    // 3) Hämta källor
+    // 3) Hämta källor (multi-tenant)
     const ids = [...new Set(matches.map((m) => m.page_id))];
     const { data: pages } = await supabase
       .from('pages')
       .select('id,title,url')
+      .eq('tenant_id', TENANT_ID)
       .in('id', ids);
     const byId = Object.fromEntries((pages || []).map((p) => [p.id, p]));
 

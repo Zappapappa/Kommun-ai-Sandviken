@@ -12,26 +12,31 @@ const openai = new OpenAI({
   project: process.env.OPENAI_PROJECT_ID,
 });
 
-console.log('\n🧪 TESTAR CHUNKS_V2 SÖKNING\n');
+// Multi-tenant: Sandviken tenant ID
+const TENANT_ID = process.env.TENANT_ID || 'fda40f49-f0bf-47eb-b2dc-675e7385dc42';
+
+console.log('\n🧪 TESTAR DOCUMENT_CHUNKS SÖKNING (MULTI-TENANT)\n');
 console.log('='.repeat(60));
 
-// Test 1: Kolla att tabellen har data
-console.log('\n📊 Test 1: Antal rader i chunks_v2...');
+// Test 1: Kolla att tabellen har data (multi-tenant)
+console.log('\n📊 Test 1: Antal rader i document_chunks för tenant...');
 const { data: countData, error: countError } = await supabase
-  .from('chunks_v2')
-  .select('id', { count: 'exact', head: true });
+  .from('document_chunks')
+  .select('id', { count: 'exact', head: true })
+  .eq('tenant_id', TENANT_ID);
 
 if (countError) {
   console.log('❌ Fel:', countError.message);
 } else {
-  console.log(`✅ chunks_v2 innehåller ${countData?.length || 0} chunks`);
+  console.log(`✅ document_chunks innehåller ${countData?.length || 0} chunks för tenant ${TENANT_ID}`);
 }
 
-// Test 2: Visa kategorier
-console.log('\n📂 Test 2: Kategorier i databasen...');
+// Test 2: Visa kategorier (multi-tenant)
+console.log('\n📂 Test 2: Kategorier i databasen för tenant...');
 const { data: categories, error: catError } = await supabase
-  .from('chunks_v2')
+  .from('document_chunks')
   .select('category')
+  .eq('tenant_id', TENANT_ID)
   .limit(1000);
 
 if (catError) {
@@ -49,8 +54,8 @@ if (catError) {
     });
 }
 
-// Test 3: Testa match_chunks_v2 RPC
-console.log('\n🔍 Test 3: Testar match_chunks_v2 RPC-funktion...');
+// Test 3: Testa match_chunks RPC (multi-tenant)
+console.log('\n🔍 Test 3: Testar match_chunks RPC-funktion (multi-tenant)...');
 const testQuery = 'Hur ansöker jag om bygglov?';
 console.log(`Fråga: "${testQuery}"`);
 
@@ -61,13 +66,14 @@ const embeddingResp = await openai.embeddings.create({
 });
 const queryEmbedding = embeddingResp.data[0].embedding;
 
-// Test utan kategorifilter
+// Test utan kategorifilter (men med tenant_id)
 console.log('\n  → Söker utan kategorifilter...');
 const { data: results1, error: error1 } = await supabase
-  .rpc('match_chunks_v2', {
+  .rpc('match_chunks', {
     query_embedding: queryEmbedding,
+    match_threshold: 0.3,
     match_count: 3,
-    similarity_threshold: 0.3,
+    tenant_id_param: TENANT_ID,
     filter_category: null
   });
 
@@ -81,13 +87,14 @@ if (error1) {
   });
 }
 
-// Test med kategorifilter
+// Test med kategorifilter (med tenant_id)
 console.log('\n  → Söker med filter: "Bygga, bo och miljö"...');
 const { data: results2, error: error2 } = await supabase
-  .rpc('match_chunks_v2', {
+  .rpc('match_chunks', {
     query_embedding: queryEmbedding,
+    match_threshold: 0.3,
     match_count: 3,
-    similarity_threshold: 0.3,
+    tenant_id_param: TENANT_ID,
     filter_category: 'Bygga, bo och miljö'
   });
 
